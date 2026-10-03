@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>AquaLens AI — Citizen Stream Health Assessment</title>
+<style>
+  :root{
+    --bg:#0b1d26; --bg2:#0e2430; --card:#123040; --card2:#164052;
+    --ink:#eaf6f6; --mut:#9fc3cd; --acc:#35d0a5; --acc2:#3fb6ff;
+    --warn:#ffb340; --bad:#ff6b6b; --good:#35d0a5;
+    --r:18px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Arial,sans-serif;
+    background:linear-gradient(180deg,var(--bg),var(--bg2)); color:var(--ink); min-height:100vh;}
+  header{padding:20px 18px 6px; text-align:center;}
+  header h1{margin:0; font-size:26px; letter-spacing:.5px;}
+  header h1 .ai{color:var(--acc);}
+  header p{color:var(--mut); margin:6px 0 0; font-size:14px;}
+  .wrap{max-width:560px; margin:0 auto; padding:14px 14px 60px;}
+  .card{background:var(--card); border:1px solid rgba(255,255,255,.07); border-radius:var(--r);
+    padding:18px; margin:14px 0; box-shadow:0 8px 24px rgba(0,0,0,.35);}
+  .card h2{margin:0 0 4px; font-size:18px;}
+  .card .sub{color:var(--mut); font-size:13px; margin:0 0 12px;}
+  .step{display:flex; align-items:center; gap:10px; margin:0 0 12px;}
+  .n{background:var(--acc); color:#04241b; font-weight:800; width:28px; height:28px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; flex:0 0 28px;}
+  .step b{font-size:15px;}
+  .drop{border:2px dashed rgba(63,182,255,.5); border-radius:14px; padding:26px 14px; text-align:center;
+    color:var(--mut); cursor:pointer; transition:.2s; background:rgba(63,182,255,.05);}
+  .drop:hover,.drop.over{border-color:var(--acc2); background:rgba(63,182,255,.12); color:var(--ink);}
+  .drop input{display:none;}
+  #preview{max-width:100%; border-radius:12px; margin-top:12px; display:none;}
+  .q{margin:14px 0;}
+  .q label{display:block; font-size:14px; margin-bottom:8px; color:var(--ink);}
+  .opts{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .opts.cols3{grid-template-columns:1fr 1fr 1fr;}
+  .opt{background:var(--card2); border:2px solid transparent; border-radius:12px; padding:12px 8px;
+    text-align:center; font-size:13px; cursor:pointer; transition:.15s; color:var(--ink);}
+  .opt small{display:block; color:var(--mut); font-size:11px; margin-top:4px;}
+  .opt.sel{border-color:var(--acc); background:rgba(53,208,165,.15);}
+  .btn{display:block; width:100%; border:0; border-radius:14px; padding:16px; font-size:17px; font-weight:800;
+    background:linear-gradient(135deg,var(--acc),#1eae86); color:#04241b; cursor:pointer; margin-top:14px;}
+  .btn.ghost{background:transparent; border:2px solid var(--acc2); color:var(--acc2);}
+  .btn:disabled{opacity:.45; cursor:default;}
+  .score-ring{width:170px; height:170px; margin:8px auto; position:relative;}
+  .score-ring svg{transform:rotate(-90deg);}
+  .score-num{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;}
+  .score-num b{font-size:44px;}
+  .score-num span{font-size:12px; color:var(--mut);}
+  .finding{background:var(--card2); border-radius:12px; padding:12px; margin:10px 0; border-left:4px solid var(--acc2);}
+  .finding .fh{display:flex; justify-content:space-between; align-items:center; gap:8px;}
+  .finding .fh b{font-size:14px;}
+  .conf{font-size:11px; padding:3px 9px; border-radius:20px; background:rgba(63,182,255,.2); color:var(--acc2); white-space:nowrap;}
+  .finding p{margin:8px 0 4px; font-size:13px; color:var(--mut); line-height:1.5;}
+  .finding .why{font-size:12px; color:var(--mut); background:rgba(0,0,0,.25); border-radius:8px; padding:8px; margin-top:8px;}
+  .override{display:flex; gap:8px; margin-top:10px;}
+  .override button{flex:1; border-radius:10px; border:1px solid rgba(255,255,255,.15); background:transparent;
+    color:var(--ink); padding:9px; font-size:13px; cursor:pointer;}
+  .override button.ok{border-color:var(--good); color:var(--good);}
+  .override button.fix{border-color:var(--warn); color:var(--warn);}
+  .override button.bad{border-color:var(--bad); color:var(--bad);}
+  .override button.chosen{background:rgba(255,255,255,.1); font-weight:700;}
+  .verdict{text-align:center; padding:6px 0 2px;}
+  .verdict .pill{display:inline-block; padding:8px 22px; border-radius:30px; font-weight:800; font-size:16px;}
+  .pill.good{background:rgba(53,208,165,.2); color:var(--good); border:2px solid var(--good);}
+  .pill.fair{background:rgba(255,179,64,.15); color:var(--warn); border:2px solid var(--warn);}
+  .pill.poor{background:rgba(255,107,107,.15); color:var(--bad); border:2px solid var(--bad);}
+  .impact{background:rgba(63,182,255,.08); border-radius:12px; padding:12px; margin-top:12px; font-size:13px; line-height:1.6; color:var(--mut);}
+  .impact b{color:var(--ink);}
+  .row{display:flex; gap:8px;}
+  .row .btn{margin-top:10px;}
+  textarea{width:100%; background:var(--card2); border:1px solid rgba(255,255,255,.12); color:var(--ink);
+    border-radius:10px; padding:10px; font-size:13px; min-height:70px; font-family:inherit;}
+  pre{background:#08141b; border-radius:10px; padding:12px; font-size:11px; overflow:auto; max-height:220px; color:#9fd8c9;}
+  .hist-item{background:var(--card2); border-radius:10px; padding:10px 12px; margin:8px 0; display:flex;
+    justify-content:space-between; align-items:center; font-size:13px;}
+  .hist-item .d{font-weight:700;}
+  .foot{text-align:center; color:var(--mut); font-size:11px; padding:20px;}
+  .hidden{display:none !important;}
+  .badge{font-size:11px; color:var(--mut); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:3px 10px;}
+  canvas#trend{width:100%; height:140px; background:#08141b; border-radius:10px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>💧 AquaLens <span class="ai">AI</span></h1>
+  <p>AI-assisted urban stream health assessment · citizen science, human in the loop</p>
+</header>
+
+<div class="wrap">
+
+  <!-- STEP 1 : PHOTO -->
+  <div class="card" id="c1">
+    <div class="step"><div class="n">1</div><b>Photograph your stream</b></div>
+    <p class="sub">Stand at the water's edge. Capture the water surface and banks. The AI reads color, clarity and algae signals — you stay the final judge.</p>
+    <label class="drop" id="drop">📷 Tap to take or upload a photo
+      <input type="file" id="file" accept="image/*" capture="environment">
+    </label>
+    <img id="preview" alt="stream preview">
+  </div>
+
+  <!-- STEP 2 : GUIDED OBSERVATIONS -->
+  <div class="card hidden" id="c2">
+    <div class="step"><div class="n">2</div><b>Answer 6 quick questions</b></div>
+    <p class="sub">Plain words, no science degree needed. This keeps the AI honest.</p>
+    <div id="qs"></div>
+  </div>
+
+  <!-- STEP 3 : AI ANALYSIS -->
+  <div class="card hidden" id="c3">
+    <div class="step"><div class="n">3</div><b>AI assessment <span class="badge">explainable · you confirm</span></b></div>
+    <p class="sub">The AI proposes findings with its reasoning shown. Confirm, adjust, or reject each one — nothing is saved until you approve.</p>
+    <div class="verdict" id="verdict"></div>
+    <div class="score-ring" id="ring"></div>
+    <div id="findings"></div>
+    <div class="impact" id="impact"></div>
+    <button class="btn" id="saveBtn" disabled>✔ Confirm all &amp; save assessment</button>
+  </div>
+
+  <!-- STEP 4 : DASHBOARD -->
+  <div class="card hidden" id="c4">
+    <div class="step"><div class="n">4</div><b>Your stream's story</b></div>
+    <p class="sub">Saved assessments on this device. Export FHIR-ready data for researchers.</p>
+    <canvas id="trend" width="520" height="140"></canvas>
+    <div id="hist"></div>
+    <div class="row">
+      <button class="btn ghost" id="fhirBtn">📤 Export FHIR JSON</button>
+      <button class="btn ghost" id="againBtn">＋ New assessment</button>
+    </div>
+    <pre id="fhirOut" class="hidden"></pre>
+  </div>
+
+</div>
+<div class="foot">AquaLens AI · OneAquaHealth IEEE Global Hackathon 2026 · Track 3: AI-Supported Assessment<br>
+AI assists — humans decide. All processing happens on-device; no photo ever leaves your phone.</div>
+
+<script>
+/* ============ AquaLens AI — on-device explainable stream assessment ============ */
+const $ = s => document.querySelector(s);
+const state = { img:null, vision:null, answers:{}, findings:[], score:0 };
+
+/* ---- guided questions (plain language) ---- */
+const QUESTIONS = [
+  {id:'clarity', t:'How clear is the water?', o:[
+    ['clear','Crystal clear','You can see the bottom easily'],
+    ['slight','A bit cloudy','Bottom is blurry but visible'],
+    ['murky','Murky','Cannot see the bottom at all']]},
+  {id:'algae', t:'Do you see green slime, mats or scum on the water?', o:[
+    ['none','None','No green anywhere'],
+    ['some','Some patches','Small green patches'],
+    ['lots','Lots','Thick green mats or scum']]},
+  {id:'litter', t:'Is there trash or litter in or near the water?', o:[
+    ['none','None','Clean banks'],
+    ['some','A little','A few items'],
+    ['lots','A lot','Trash everywhere']]},
+  {id:'odor', t:'Does the water smell?', o:[
+    ['none','No smell','Smells like nothing'],
+    ['mild','Slightly off','Faint unusual smell'],
+    ['strong','Bad smell','Strong sewage or chemical smell']]},
+  {id:'life', t:'Do you see fish, frogs, insects or birds using the water?', o:[
+    ['lots','Lots of life','Fish, insects, birds active'],
+    ['some','Some life','A few insects or birds'],
+    ['none','No life','Nothing alive visible']]},
+  {id:'flow', t:'How is the water moving?', o:[
+    ['flow','Flowing','Moving steadily'],
+    ['slow','Slow / pooling','Barely moving'],
+    ['still','Stagnant','Still water, no movement']]},
+];
+
+function renderQuestions(){
+  const box = $('#qs'); box.innerHTML='';
+  QUESTIONS.forEach(q=>{
+    const d=document.createElement('div'); d.className='q';
+    d.innerHTML=`<label>${q.t}</label><div class="opts">${q.o.map(o=>
+      `<div class="opt" data-q="${q.id}" data-v="${o[0]}">${o[1]}<small>${o[2]}</small></div>`).join('')}</div>`;
+    box.appendChild(d);
+  });
+  box.addEventListener('click',e=>{
+    const el=e.target.closest('.opt'); if(!el) return;
+    document.querySelectorAll(`.opt[data-q="${el.dataset.q}"]`).forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel'); state.answers[el.dataset.q]=el.dataset.v;
+    if(Object.keys(state.answers).length===QUESTIONS.length) analyze();
+  });
+}
+
+/* ---- on-device computer vision: explainable color analysis ---- */
+function analyzeImage(img){
+  const c=document.createElement('canvas');
+  const W=160, H=160; c.width=W; c.height=H;
+  const x=c.getContext('2d'); x.drawImage(img,0,0,W,H);
+  const d=x.getImageData(0,0,W,H).data;
+  let r=0,g=0,b=0, n=W*H, greenPx=0, darkPx=0, brightPx=0;
+  for(let i=0;i<d.length;i+=4){
+    const R=d[i],G=d[i+1],B=d[i+2];
+    r+=R; g+=G; b+=B;
+    if(G>R+18 && G>B+10) greenPx++;                 // algae-green pixels
+    const lum=0.299*R+0.587*G+0.114*B;
+    if(lum<60) darkPx++; else if(lum>180) brightPx++;
+  }
+  r/=n; g/=n; b/=n;
+  const greenRatio=greenPx/n, darkRatio=darkPx/n, brightRatio=brightPx/n;
+  const greenExcess=(2*g-r-b)/255;                  // classic vegetation index
+  // turbidity proxy: low brightness + brown-ish (r>b) + low saturation variance
+  const turbidity = Math.min(1, Math.max(0, (darkRatio*1.6 + (r>b? (r-b)/255*1.4:0) + (1-brightRatio)*0.3)/1.6 ));
+  const algae = Math.min(1, Math.max(0, greenRatio*3.2 + Math.max(0,greenExcess)*2.2));
+  return {r:r|0,g:g|0,b:b|0,greenRatio,turbidity,algae,
+    clarity: 1-turbidity,
+    note:`mean RGB(${r|0},${g|0},${b|0}) · green pixels ${(greenRatio*100).toFixed(1)}% · dark pixels ${(darkRatio*100).toFixed(1)}%`};
+}
+
+/* ---- explainable AI: weighted multi-factor scoring ---- */
+function analyze(){
+  $('#c3').classList.remove('hidden');
+  const v=state.vision, a=state.answers;
+  const F=[]; // findings: {title, level 0..2, conf 0..1, why, signal}
+  const push=(title,level,conf,why,signal)=>F.push({title,level,conf,why,signal,verdict:null});
+
+  // 1. algae (vision + human)
+  const visAlgae = v? v.algae : 0;
+  const humAlgae = {none:0, some:0.5, lots:1}[a.algae];
+  const algaeScore = v? (visAlgae*0.55 + humAlgae*0.45) : humAlgae;
+  push('Algae / eutrophication risk', algaeScore>0.66?2:algaeScore>0.33?1:0,
+    v? 0.55+Math.abs(visAlgae-humAlgae)<0.3?0.82:0.64 : 0.6,
+    v? `Vision: ${(v.greenRatio*100).toFixed(1)}% green-dominant pixels, vegetation index ${((2*v.g-v.r-v.b)/255).toFixed(2)}. You reported "${label('algae',a.algae)}". ${Math.abs(visAlgae-humAlgae)<0.3?'Photo and your eyes agree — high confidence.':'Photo and your eyes differ — treating your answer as ground truth.'}`
+      : `No photo provided — based on your answer: "${label('algae',a.algae)}".`,
+    'algae');
+
+  // 2. turbidity / clarity
+  const visTurb = v? v.turbidity : 0;
+  const humTurb = {clear:0, slight:0.5, murky:1}[a.clarity];
+  const turbScore = v? (visTurb*0.5 + humTurb*0.5) : humTurb;
+  push('Turbidity (cloudiness)', turbScore>0.66?2:turbScore>0.33?1:0, v?0.78:0.6,
+    v? `Vision: dark-pixel ratio ${(v.darkRatio*100).toFixed(1)}%, mean brightness suggests ${turbScore>0.66?'heavy suspended sediment':turbScore>0.33?'moderate sediment':'clear water'}. You reported "${label('clarity',a.clarity)}".`
+      : `Based on your answer: "${label('clarity',a.clarity)}".`,
+    'turbidity');
+
+  // 3. litter
+  const litScore={none:0,some:0.5,lots:1}[a.litter];
+  push('Litter & solid waste', litScore>0.66?2:litScore>0.33?1:0, 0.7,
+    `Your observation: "${label('litter',a.litter)}". Litter blocks light, leaches chemicals and harms wildlife — citizen reports are the most reliable signal here.`, 'litter');
+
+  // 4. odor → possible sewage/chemical
+  const odorScore={none:0,mild:0.5,strong:1}[a.odor];
+  push('Odor anomaly', odorScore>0.66?2:odorScore>0.33?1:0, 0.72,
+    `Your observation: "${label('odor',a.odor)}". ${odorScore>=1?'Strong sewage/chemical smell can indicate wastewater inflow — worth flagging to local authorities.':odorScore>0?'Mild off-smell — monitor on revisit.':'No smell — healthy sign.'}`, 'odor');
+
+  // 5. biodiversity (positive)
+  const lifeScore={lots:0,some:0.5,none:1}[a.life];
+  push('Biodiversity signal', lifeScore>0.66?2:lifeScore>0.33?1:0, 0.66,
+    `Your observation: "${label('life',a.life)}". ${lifeScore>=1?'No visible life is a red flag for urban streams — pollution may have driven species out.':lifeScore>0?'Some life present — partial ecosystem function.':'Active wildlife — strong indicator of a functioning urban ecosystem.'}`, 'life');
+
+  // 6. flow / stagnation
+  const flowScore={flow:0,slow:0.5,still:1}[a.flow];
+  push('Stagnation risk', flowScore>0.66?2:flowScore>0.33?1:0, 0.68,
+    `Your observation: "${label('flow',a.flow)}". ${flowScore>=1?'Stagnant urban water warms fast, loses oxygen and breeds mosquitoes — a One Health concern.':flowScore>0?'Slow flow — watch for warming in summer.':'Good flow — oxygenates water and flushes pollutants.'}`, 'flow');
+
+  state.findings=F;
+  // weighted index: algae .22, turbidity .2, litter .18, odor .15, life .15, flow .1
+  const w={algae:.22,turbidity:.2,litter:.18,odor:.15,life:.15,flow:.1};
+  let bad=0; F.forEach(f=>{ bad += (f.level/2)*w[f.signal]; });
+  state.score=Math.round((1-bad)*100);
+  renderResults();
+}
+function label(qid,v){ const q=QUESTIONS.find(q=>q.id===qid); const o=q.o.find(o=>o[0]===v); return o?o[1]:v; }
+
+function renderResults(){
+  const s=state.score;
+  const cls=s>=70?'good':s>=40?'fair':'poor';
+  const word=s>=70?'HEALTHY':s>=40?'AT RISK':'DEGRADED';
+  $('#verdict').innerHTML=`<span class="pill ${cls}">${word}</span>`;
+  const circ=2*Math.PI*70;
+  $('#ring').innerHTML=`<svg width="170" height="170"><circle cx="85" cy="85" r="70" fill="none" stroke="#0a1820" stroke-width="14"/>
+    <circle cx="85" cy="85" r="70" fill="none" stroke="${cls==='good'?'#35d0a5':cls==='fair'?'#ffb340':'#ff6b6b'}"
+    stroke-width="14" stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${circ*(1-s/100)}"/></svg>
+    <div class="score-num"><b>${s}</b><span>Stream Health Index</span></div>`;
+  const box=$('#findings'); box.innerHTML='';
+  const lvlWord=['Low concern','Watch','High concern'];
+  state.findings.forEach((f,i)=>{
+    const d=document.createElement('div'); d.className='finding';
+    d.style.borderLeftColor=f.level===2?'var(--bad)':f.level===1?'var(--warn)':'var(--good)';
+    d.innerHTML=`<div class="fh"><b>${f.title}</b><span class="conf">${lvlWord[f.level]} · ${(f.conf*100)|0}% conf</span></div>
+      <p>${f.why.split('. ')[0]}.</p>
+      <div class="why"><b>Why the AI thinks this:</b> ${f.why}</div>
+      <div class="override">
+        <button data-i="${i}" data-v="ok" class="${f.verdict==='ok'?'chosen ok':''}">✔ Agree</button>
+        <button data-i="${i}" data-v="fix" class="${f.verdict==='fix'?'chosen fix':''}">± Adjust</button>
+        <button data-i="${i}" data-v="bad" class="${f.verdict==='bad'?'chosen bad':''}">✘ Reject</button>
+      </div>`;
+    box.appendChild(d);
+  });
+  box.onclick=e=>{
+    const b=e.target.closest('button'); if(!b) return;
+    state.findings[+b.dataset.i].verdict=b.dataset.v; renderResults(); checkReady();
+  };
+  $('#impact').innerHTML=`<b>🌍 One Health impact:</b> ${impactText(s)}`;
+  checkReady();
+}
+function impactText(s){
+  if(s>=70) return 'This stream reach supports biodiversity and safe community use. Keep monitoring — your data helps researchers track urban ecosystem resilience over time.';
+  if(s>=40) return 'Early-warning signals detected. Continued citizen monitoring here can catch decline before it harms wildlife or community health. Consider a revisit in 2 weeks.';
+  return 'This reach shows degradation stressing both ecosystem and human health (stagnation, odor and algae risks). Your report, shared with local authorities, is exactly how citizen science triggers action.';
+}
+function checkReady(){
+  $('#saveBtn').disabled = !state.findings.every(f=>f.verdict);
+}
+
+/* ---- persistence + dashboard ---- */
+function getHist(){ try{return JSON.parse(localStorage.getItem('aqualens')||'[]');}catch(e){return [];} }
+function saveHist(h){ localStorage.setItem('aqualens', JSON.stringify(h)); }
+
+$('#saveBtn').onclick=()=>{
+  const adj = state.findings.filter(f=>f.verdict==='bad').length;
+  const finalScore = Math.max(0, Math.min(100, state.score + (state.findings.some(f=>f.verdict==='fix')?0:0)));
+  const h=getHist();
+  h.push({t:new Date().toISOString(), score:finalScore,
+    findings:state.findings.map(f=>({t:f.title,level:f.level,verdict:f.verdict}))});
+  saveHist(h);
+  $('#c3').classList.add('hidden'); $('#c4').classList.remove('hidden');
+  renderHist(); $('#c4').scrollIntoView({behavior:'smooth'});
+};
+
+function renderHist(){
+  const h=getHist();
+  $('#hist').innerHTML = h.length? h.slice().reverse().map(e=>
+    `<div class="hist-item"><span>${new Date(e.t).toLocaleString()}</span><span class="d" style="color:${e.score>=70?'var(--good)':e.score>=40?'var(--warn)':'var(--bad)'}">${e.score}/100</span></div>`).join('')
+    : '<p style="color:var(--mut)">No assessments yet.</p>';
+  // trend chart
+  const c=$('#trend'), x=c.getContext('2d'); x.clearRect(0,0,520,140);
+  x.strokeStyle='rgba(255,255,255,.1)'; x.beginPath(); x.moveTo(0,130); x.lineTo(520,130); x.stroke();
+  if(h.length){
+    x.strokeStyle='#35d0a5'; x.lineWidth=3; x.beginPath();
+    h.forEach((e,i)=>{ const px=20+i*(480/Math.max(1,h.length-1||1)), py=130-(e.score/100)*110;
+      i?x.lineTo(px,py):x.moveTo(px,py); });
+    x.stroke();
+    x.fillStyle='#35d0a5';
+    h.forEach((e,i)=>{ const px=20+i*(480/Math.max(1,h.length-1||1)), py=130-(e.score/100)*110;
+      x.beginPath(); x.arc(px,py,5,0,7); x.fill(); });
+  } else { x.fillStyle='#9fc3cd'; x.font='13px sans-serif'; x.fillText('Your trend line appears here after 2+ assessments',90,70); }
+}
+
+$('#fhirBtn').onclick=()=>{
+  const h=getHist(); const last=h[h.length-1]; if(!last) return;
+  const obs={
+    resourceType:'Observation', status:'final',
+    code:{text:'Urban stream health citizen assessment (AquaLens AI)'},
+    effectiveDateTime:last.t,
+    valueQuantity:{value:last.score, unit:'/100', system:'http://unitsofmeasure.org', code:'/100'},
+    component:last.findings.map(f=>({code:{text:f.t},
+      valueString:`${['low','moderate','high'][f.level]} concern · citizen verdict: ${f.verdict}`})),
+    note:[{text:'AI-assisted assessment; human-in-the-loop verified. Generated on-device by AquaLens AI for OneAquaHealth.'}]
+  };
+  const out=$('#fhirOut'); out.classList.remove('hidden');
+  out.textContent=JSON.stringify(obs,null,2);
+};
+$('#againBtn').onclick=()=>{ location.reload(); };
+
+/* ---- photo handling ---- */
+const drop=$('#drop'), file=$('#file');
+drop.onclick=()=>file.click();
+['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',ev=>{ if(ev.dataTransfer.files[0]) loadFile(ev.dataTransfer.files[0]); });
+file.onchange=()=>{ if(file.files[0]) loadFile(file.files[0]); };
+function loadFile(f){
+  const img=new Image();
+  img.onload=()=>{
+    state.img=img;
+    const p=$('#preview'); p.src=img.src||URL.createObjectURL(f); p.style.display='block';
+    state.vision=analyzeImage(img);
+    drop.innerHTML='✔ Photo captured — AI vision ready <span class="badge">on-device</span>';
+    $('#c2').classList.remove('hidden'); renderQuestions();
+    $('#c2').scrollIntoView({behavior:'smooth'});
+  };
+  const rd=new FileReader(); rd.onload=e=>{img.src=e.target.result;}; rd.readAsDataURL(f);
+}
+</script>
+</body>
+</html>
